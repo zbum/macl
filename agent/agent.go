@@ -26,7 +26,7 @@ func NewAgent(controlPort int) *Agent {
 }
 
 func (a *Agent) Start() {
-	startUdpAgent(a.logger, a.controlPort)
+	startAgent(a.logger, a.controlPort)
 
 	// Wait for a signal to terminate the server
 	done := make(chan os.Signal, 1)
@@ -34,7 +34,7 @@ func (a *Agent) Start() {
 	<-done
 }
 
-func startUdpAgent(log *slog.Logger, port int) {
+func startAgent(log *slog.Logger, port int) {
 	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("", strconv.Itoa(port)))
 	if err != nil {
 		log.Info("macl agent start failed", "error", err)
@@ -55,33 +55,34 @@ func startUdpAgent(log *slog.Logger, port int) {
 			log.Warn("acl control signal 수신 실패 : %v\n", err)
 		}
 		signalBytes := buffer[:read]
-		log.Info("acl control signal 수신 성공 : %s\n", string(signalBytes))
+		log.Info("acl control signal received successfully")
+		log.Debug("acl control signal payload", string(signalBytes))
 
 		controlSignal, err := parseControlSignal(signalBytes)
 		if err != nil {
-			log.Warn("acl control signal parse 실패 : %v\n", err)
+			log.Warn("acl control signal parse failed", err)
 			sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(0, "acl control signal parse 실패", err))
 			continue
 		}
 
-		log.Info("acl control signal parse 성공 : %s\n", controlSignal)
+		log.Info("acl control signal parse successfully")
 
-		if isServer, err := amIServer(controlSignal.FiveTuple); err != nil && isServer {
+		if isServer, err := amIServer(controlSignal.FiveTuple); err == nil && isServer {
 			log.Info("acl control signal amIServer 성공 : %s\n", controlSignal)
 			if controlSignal.FiveTuple.Protocol == "tcp" {
-				receivePacketFromSource(&controlSignal)
+				NewTestReceiver(log).receivePacketFromSource(&controlSignal)
 			}
 		}
 		if err != nil {
-			log.Warn("acl control signal amIServer 실패 : %v\n", err)
+			log.Warn("acl control signal amIServer failed : %v\n", err)
 			sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(0, "acl control signal amIServer 실패", err))
 			continue
 		}
 
-		if isClient, err := amIClient(controlSignal.FiveTuple); err != nil && isClient {
+		if isClient, err := amIClient(controlSignal.FiveTuple); err == nil && isClient {
 			log.Info("acl control signal amIClient 성공 : %s\n", controlSignal)
 			if controlSignal.FiveTuple.Protocol == "tcp" {
-				NewTestSender().sendPacketToDestination(&controlSignal)
+				NewTestSender(log).sendPacketToDestination(&controlSignal)
 			}
 		}
 		if err != nil {

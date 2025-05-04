@@ -1,29 +1,39 @@
 package agent
 
 import (
-	"fmt"
 	"io"
+	"log/slog"
 	controlsignal "macl/signal"
 	"net"
 	"strconv"
 	"time"
 )
 
-func receivePacketFromSource(controlSignal *controlsignal.ControlSignal) {
+type TestReceiver struct {
+	log *slog.Logger
+}
 
-	if controlSignal.FiveTuple.Protocol == "tcp" {
-		go receiveTcpSignal(controlSignal.FiveTuple.DestPort)
+func NewTestReceiver(log *slog.Logger) *TestReceiver {
+	return &TestReceiver{
+		log: log,
 	}
 }
 
-func receiveTcpSignal(port int) {
+func (r *TestReceiver) receivePacketFromSource(controlSignal *controlsignal.ControlSignal) {
+
+	if controlSignal.FiveTuple.Protocol == "tcp" {
+		go receiveTcpSignal(r.log, controlSignal.FiveTuple.DestPort)
+	}
+}
+
+func receiveTcpSignal(log *slog.Logger, port int) {
 
 	listener, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
-		fmt.Printf("macl receiver start failed: %v \n", err)
+		log.Warn("[macl-agent-receiver] start failed", "error", err)
 		return
 	}
-	fmt.Printf("macl receiver started: %v \n", listener.Addr())
+	log.Info("[macl-agent-receiver] started", "address", listener.Addr())
 
 	connection, err := listener.Accept()
 	if err != nil {
@@ -31,26 +41,32 @@ func receiveTcpSignal(port int) {
 	}
 	defer connection.Close()
 
-	fmt.Printf("macl receiver connected : Remote: %v, Local: %v\n", connection.RemoteAddr(), connection.LocalAddr())
+	log.Info("[macl-agent-receiver] connected ", "remote", connection.RemoteAddr(), "local", connection.LocalAddr())
 
 	buffer := make([]byte, 1000)
 
 	err = connection.SetDeadline(time.Now().Add(5 * time.Second))
 	if err != nil {
-		fmt.Printf("macl server receive failed : %v\n", err)
+		log.Warn("[macl-agent-receiver] receive failed", "error", err)
 		return
 	}
 	read, err := connection.Read(buffer)
 	if err != nil {
 		if err == io.EOF {
-			fmt.Printf("macl server receive failed : %v\n", err)
+			log.Warn("[macl-agent-receiver] receive failed", "error", err)
 		} else {
-			fmt.Printf("macl server receive failed : %v\n", err)
+			log.Warn("[macl-agent-receiver] receive failed", "error", err)
 		}
 		return
 	}
+	log.Info("[macl-agent-receiver] received successfully", "port", strconv.Itoa(port))
+	log.Debug("[macl-agent-receiver] received payload", string(buffer[:read]))
 
-	fmt.Printf("macl server received successfully [%s]: %s\n", net.JoinHostPort("", strconv.Itoa(port)), string(buffer[:read]))
 	_, err = connection.Write(buffer[:read])
+	if err != nil {
+		log.Warn("[macl-agent-receiver] send failed : %v\n", err)
+		return
+	}
 
+	log.Info("[macl-agent-receiver] send successfully")
 }

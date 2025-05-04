@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"fmt"
 	"log/slog"
 	controlsignal "macl/signal"
 	"net"
@@ -21,18 +20,22 @@ type TestSender struct {
 	log *slog.Logger
 }
 
-func NewTestSender() *TestSender {
+func NewTestSender(log *slog.Logger) *TestSender {
 	return &TestSender{
-		log: slog.Default(),
+		log: log,
 	}
 }
 
 func (s *TestSender) sendPacketToDestination(controlSignal *controlsignal.ControlSignal) {
 
 	for trial := range 3 {
-		fmt.Printf("trial %d\n", trial)
+		s.log.Debug("trial", "count", trial)
 		if controlSignal.FiveTuple.Protocol == "tcp" {
-			sendTcpPacket(s.log, controlSignal.FiveTuple.DestJoinedAddress())
+			_, err := sendTcpPacket(s.log, controlSignal.FiveTuple.DestJoinedAddress())
+			if err != nil {
+				s.log.Warn("sendTcpPacket", "error", err)
+				return
+			}
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -42,11 +45,11 @@ func sendTcpPacket(log *slog.Logger, joinedAddress string) (bool, error) {
 	connection, err := net.DialTimeout("tcp", joinedAddress, 1*time.Second)
 
 	if err != nil {
-		log.Warn("연결 실패 : %v\n", err)
+		log.Warn("[macl-agent-sender] connection failed:", "error", err)
 		return false, err
 	} else {
 		defer connection.Close()
-		log.Info("연결 성공 : %s \n", joinedAddress)
+		log.Info("[macl-agent-sender] connection success:", "joinedAddress", joinedAddress)
 
 		localAddr := connection.LocalAddr().String()
 
@@ -55,17 +58,17 @@ func sendTcpPacket(log *slog.Logger, joinedAddress string) (bool, error) {
 			log.Info("송신 실패 : %v\n", err)
 			return false, err
 		} else {
-			log.Info("송신 성공 : %v\n", httpMessage)
+			log.Info("[macl-agent-sender] send success:", "payload", httpMessage)
 		}
 
 		buffer := make([]byte, 50)
 		read, err := connection.Read(buffer)
 		if err != nil {
-			log.Info("수신 실패 [%s] %v\n", localAddr, err)
+			log.Info("[macl-agent-sender] receive failed:", "localAddr", localAddr, "error", err)
 			return false, err
 		}
-		log.Info("macl packet received successfully : \n")
-		log.Debug("macl packet : %s\n", string(buffer[:read]))
+		log.Info("[macl-agent-sender] callback packet received successfully")
+		log.Debug("[macl-agent-sender] callback packet", "payload", string(buffer[:read]))
 
 		return true, nil
 	}
