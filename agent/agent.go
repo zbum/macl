@@ -18,10 +18,10 @@ type Agent struct {
 	logger      *slog.Logger
 }
 
-func NewAgent(controlPort int) *Agent {
+func NewAgent(log *slog.Logger, controlPort int) *Agent {
 	return &Agent{
 		controlPort: controlPort,
-		logger:      slog.New(slog.NewTextHandler(os.Stdout, nil)),
+		logger:      log,
 	}
 }
 
