@@ -30,7 +30,7 @@ func main() {
 		agent := agent.NewAgent(logger, *controlPort)
 		agent.Start()
 	case "controller":
-		fileTuples := NewControllerConfig(logger).LoadConfig(*profile)
+		fileTuples := controller.NewControllerConfig(logger).LoadConfig(*profile)
 		controller := controller.NewController(logger, *controlPort)
 		controller.Start(fileTuples)
 	default:

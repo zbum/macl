@@ -1,4 +1,4 @@
-package main
+package controller
 
 import (
 	"encoding/csv"
@@ -44,22 +44,23 @@ func (c *ControllerConfig) LoadConfig(profile string) []*controlsignal.FiveTuple
 			break
 		}
 
-		if len(row) < 3 {
+		if len(row) < 4 {
 			log.Error("[macl-controller] invalid row", "row", row)
 			continue
 		}
 
-		destPort, err := strconv.Atoi(row[2])
+		destPort, err := strconv.Atoi(row[3])
 		if err != nil {
 			log.Error("[macl-controller] invalid row", "row", row, "error", err)
 			continue
 		}
 
 		fiveTuples = append(fiveTuples, &controlsignal.FiveTuple{
-			SrcAddress:  row[0],
-			DestAddress: row[1],
+			TxId:        row[0],
+			SrcAddress:  row[1],
+			DestAddress: row[2],
 			DestPort:    destPort,
-			Protocol:    row[3],
+			Protocol:    row[4],
 		})
 	}
 

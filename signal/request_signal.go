@@ -16,16 +16,17 @@ func (f ControlSignal) String() string {
 }
 
 type FiveTuple struct {
+	TxId        string `json:"txId"`
 	SrcAddress  string `json:"srcAddress"`
 	DestAddress string `json:"destAddress"`
 	DestPort    int    `json:"destPort"`
 	Protocol    string `json:"protocol"`
 }
 
-func (f *FiveTuple) DestJoinedAddress() string {
+func (f FiveTuple) DestJoinedAddress() string {
 	return net.JoinHostPort(f.DestAddress, strconv.Itoa(f.DestPort))
 }
 
 func (f FiveTuple) String() string {
-	return fmt.Sprintf("srcAddress: %s, destAddress: %s, destPort: %d, protocol: %s", f.SrcAddress, f.DestAddress, f.DestPort, f.Protocol)
+	return fmt.Sprintf("txId: %s, srcAddress: %s, destAddress: %s, destPort: %d, protocol: %s", f.TxId, f.SrcAddress, f.DestAddress, f.DestPort, f.Protocol)
 }

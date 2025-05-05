@@ -61,7 +61,7 @@ func startAgent(log *slog.Logger, port int) {
 		controlSignal, err := parseControlSignal(signalBytes)
 		if err != nil {
 			log.Warn("acl control signal parse failed", err)
-			sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(0, "acl control signal parse 실패", err))
+			sendResponse(connection, raddr, controlsignal.NewFailResponseSignal("", "acl control signal parse 실패", err))
 			continue
 		}
 
@@ -75,19 +75,26 @@ func startAgent(log *slog.Logger, port int) {
 		}
 		if err != nil {
 			log.Warn("acl control signal amIServer failed : %v\n", err)
-			sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(0, "acl control signal amIServer 실패", err))
+			sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(controlSignal.FiveTuple.TxId, "acl control signal amIServer 실패", err))
 			continue
 		}
 
 		if isClient, err := amIClient(controlSignal.FiveTuple); err == nil && isClient {
 			log.Info("acl control signal amIClient 성공 : %s\n", controlSignal)
 			if controlSignal.FiveTuple.Protocol == "tcp" {
-				NewTestSender(log).sendPacketToDestination(&controlSignal)
+				err := NewTestSender(log).sendPacketToDestination(&controlSignal)
+				if err != nil {
+					sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(controlSignal.FiveTuple.TxId, "[macl-agent-sender] test failed", err))
+					continue
+				} else {
+					sendResponse(connection, raddr, controlsignal.NewSuccessResponseSignal(controlSignal.FiveTuple.TxId, &controlSignal.FiveTuple))
+				}
+
 			}
 		}
 		if err != nil {
 			log.Warn("acl control signal amIClient 실패 : %v\n", err)
-			sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(0, "acl control signal amIClient 실패", err))
+			sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(controlSignal.FiveTuple.TxId, "acl control signal amIClient 실패", err))
 			continue
 		}
 

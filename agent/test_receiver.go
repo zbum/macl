@@ -33,6 +33,7 @@ func receiveTcpSignal(log *slog.Logger, port int) {
 		log.Warn("[macl-agent-receiver] start failed", "error", err)
 		return
 	}
+	defer listener.Close()
 	log.Info("[macl-agent-receiver] started", "address", listener.Addr())
 
 	connection, err := listener.Accept()

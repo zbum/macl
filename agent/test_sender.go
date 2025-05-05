@@ -26,19 +26,22 @@ func NewTestSender(log *slog.Logger) *TestSender {
 	}
 }
 
-func (s *TestSender) sendPacketToDestination(controlSignal *controlsignal.ControlSignal) {
-
+func (s *TestSender) sendPacketToDestination(controlSignal *controlsignal.ControlSignal) error {
+	var err error
 	for trial := range 3 {
 		s.log.Debug("trial", "count", trial)
 		if controlSignal.FiveTuple.Protocol == "tcp" {
-			_, err := sendTcpPacket(s.log, controlSignal.FiveTuple.DestJoinedAddress())
+			_, err = sendTcpPacket(s.log, controlSignal.FiveTuple.DestJoinedAddress())
 			if err != nil {
 				s.log.Warn("sendTcpPacket", "error", err)
-				return
+				continue
+			} else {
+				break
 			}
 		}
 		time.Sleep(1 * time.Second)
 	}
+	return err
 }
 
 func sendTcpPacket(log *slog.Logger, joinedAddress string) (bool, error) {
