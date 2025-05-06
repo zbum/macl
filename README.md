@@ -5,8 +5,8 @@
 * controller는 ACL을 점검할 수 있는 명령어를 agent에 전달하고, agent는 해당 명령어를 수행하여 결과를 controller에 전달합니다.
 * agent는 source 와 destination 호스트에 설치, 실행되어 있어야 합니다. 
 * agent는 controller 의 요청에 따라 패킷을 리스닝하거니 전송합니다. 
-  * source agent 는 3번 재시도하도록 되어 있으며, 3초 동안 요청에 응답이 없으면 실패로 처리합니다.
-  * destination agent 는 5초 동안 패킷을 리스닝하다가 수신 패킷이 없으면 리스닝을 종료합니다.
+  * source agent 는 destination 에 패킷을 전송합니다. 3번 재시도하도록 되어 있으며, 3초 동안 요청에 응답이 없으면 실패로 처리합니다.
+  * destination agent 는 source agent 의 패킷을 리스닝 합니다. 5초 동안 패킷을 리스닝하다가 수신 패킷이 없으면 리스닝을 종료합니다.
 
 
 ## Agent 
