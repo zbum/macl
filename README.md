@@ -35,7 +35,7 @@ $ nohup ./macl &
 ```shell
 $ ./macl -type controller
 ```
-* 디버그 모드로 실행하고 싶으면 -profile k8s -debug true 옵션을 추가합니다.
+* 디버그 모드로 실행하고 싶으면 -debug true 옵션을 추가합니다.
 ```shell
 $ ./macl -type controller -debug true
 ```
