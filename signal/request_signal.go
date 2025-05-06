@@ -2,6 +2,7 @@ package controlsignal
 
 import (
 	"fmt"
+	netutil "macl/net"
 	"net"
 	"strconv"
 )
@@ -29,4 +30,21 @@ func (f FiveTuple) DestJoinedAddress() string {
 
 func (f FiveTuple) String() string {
 	return fmt.Sprintf("txId: %s, srcAddress: %s, destAddress: %s, destPort: %d, protocol: %s", f.TxId, f.SrcAddress, f.DestAddress, f.DestPort, f.Protocol)
+}
+
+func (f FiveTuple) AmISource() (bool, error) {
+	myHostIp, err := netutil.IsMyActiveHostIp(f.SrcAddress)
+	if err != nil {
+		fmt.Println(err)
+		return false, err
+	}
+	return myHostIp, nil
+}
+
+func (f FiveTuple) AmIDestination() (bool, error) {
+	myHostIp, err := netutil.IsMyActiveHostIp(f.DestAddress)
+	if err != nil {
+		return false, err
+	}
+	return myHostIp, nil
 }

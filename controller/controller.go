@@ -57,10 +57,10 @@ func (c *Controller) sendRequestSignalToDestination(requestSignal *controlsignal
 		}
 		_, err = connection.Write(requestSignalBytes)
 		if err != nil {
-			log.Warn("[macl-controller] send failed")
+			log.Warn("[macl-controller] send failed", "error", err)
 			return
 		} else {
-			log.Info("[macl-controller] send success")
+			log.Info("[macl-controller] send request success", "destination agent", requestSignal.FiveTuple.SrcAddress)
 		}
 
 		buffer := make([]byte, 1000)
@@ -69,7 +69,7 @@ func (c *Controller) sendRequestSignalToDestination(requestSignal *controlsignal
 			return
 		}
 
-		log.Warn("[macl-controller] receive success", "localAddr", addr.String())
+		log.Info("[macl-controller] receive success", "destination agent", addr.IP)
 		log.Debug("[macl-controller] receive success", "payload", string(buffer[:read]))
 	}
 }
@@ -97,19 +97,19 @@ func (c *Controller) sendRequestSignalToSource(requestSignal *controlsignal.Cont
 		}
 		_, err = connection.Write(requestSignalBytes)
 		if err != nil {
-			log.Warn("[macl-controller] send failed")
+			log.Warn("[macl-controller] send request failed")
 			return controlsignal.NewFailResponseSignal(requestSignal.FiveTuple.TxId, "send failed", err)
 		} else {
-			log.Info("[macl-controller] send success")
+			log.Info("[macl-controller] send request success", "source agent", requestSignal.FiveTuple.SrcAddress)
 		}
 
 		buffer := make([]byte, 1000)
-		read, addr, err := connection.ReadFromUDP(buffer)
+		read, _, err := connection.ReadFromUDP(buffer)
 		if err != nil {
 			return controlsignal.NewFailResponseSignal(requestSignal.FiveTuple.TxId, "receive response failed", err)
 		}
 
-		log.Warn("[macl-controller] receive success", "localAddr", addr.String())
+		log.Warn("[macl-controller] receive success", "source agent", requestSignal.FiveTuple.SrcAddress)
 		log.Debug("[macl-controller] receive success", "payload", string(buffer[:read]))
 
 		return controlsignal.NewSuccessResponseSignal(requestSignal.FiveTuple.TxId, &requestSignal.FiveTuple)

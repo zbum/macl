@@ -2,9 +2,7 @@ package agent
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
-	netutil "macl/net"
 	controlsignal "macl/signal"
 	"net"
 	"os"
@@ -26,7 +24,7 @@ func NewAgent(log *slog.Logger, controlPort int) *Agent {
 }
 
 func (a *Agent) Start() {
-	startAgent(a.logger, a.controlPort)
+	a.startUdpListener()
 
 	// Wait for a signal to terminate the server
 	done := make(chan os.Signal, 1)
@@ -34,72 +32,76 @@ func (a *Agent) Start() {
 	<-done
 }
 
-func startAgent(log *slog.Logger, port int) {
+func (a *Agent) startUdpListener() {
+	log := a.logger
+	port := a.controlPort
+
 	udpAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("", strconv.Itoa(port)))
 	if err != nil {
-		log.Info("macl agent start failed", "error", err)
+		log.Info("[macl-agent] start failed", "error", err)
 		return
 	}
 	connection, err := net.ListenUDP("udp4", udpAddr)
 	if err != nil {
-		log.Warn("macl agent start failed", "error", err)
+		log.Warn("[macl-agent]start failed", "error", err)
 		return
 	}
 	defer connection.Close()
-	log.Info("macl agent started", "udpAddr", udpAddr)
+	log.Info("[macl-agent] agent started", "udpAddr", udpAddr)
+
+	a.requestProcess(connection)
+
+}
+
+func (a *Agent) requestProcess(connection *net.UDPConn) {
+	log := a.logger
 
 	buffer := make([]byte, 8192)
 	for {
 		read, raddr, err := connection.ReadFromUDP(buffer)
 		if err != nil {
-			log.Warn("acl control signal 수신 실패 : %v\n", err)
+			log.Warn("[macl-agent] control signal read failed", "error", err)
 		}
 		signalBytes := buffer[:read]
-		log.Info("acl control signal received successfully")
-		log.Debug("acl control signal payload", string(signalBytes))
+		log.Info("[macl-agent] control signal received successfully")
+		log.Debug("[macl-agent] control signal", "payload", string(signalBytes))
 
 		controlSignal, err := parseControlSignal(signalBytes)
 		if err != nil {
-			log.Warn("acl control signal parse failed", err)
-			sendResponse(connection, raddr, controlsignal.NewFailResponseSignal("", "acl control signal parse 실패", err))
+			log.Warn("[macl-agent] control signal parse failed", err)
+			a.sendResponse(connection, raddr, controlsignal.NewFailResponseSignal("", "acl control signal parse 실패", err))
 			continue
 		}
 
-		log.Info("acl control signal parse successfully")
+		log.Info("[macl-agent] acl control signal parse successfully")
 
-		if isServer, err := amIServer(controlSignal.FiveTuple); err == nil && isServer {
-			log.Info("acl control signal amIServer 성공 : %s\n", controlSignal)
-			if controlSignal.FiveTuple.Protocol == "tcp" {
-				NewTestReceiver(log).receivePacketFromSource(&controlSignal)
-			}
+		if isDestination, err := controlSignal.FiveTuple.AmIDestination(); err == nil && isDestination {
+			log.Info("[macl-agent] control signal amIServer 성공 : %s\n", controlSignal)
+			NewTestReceiver(log).receivePacketFromSource(&controlSignal)
 		}
 		if err != nil {
-			log.Warn("acl control signal amIServer failed : %v\n", err)
-			sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(controlSignal.FiveTuple.TxId, "acl control signal amIServer 실패", err))
+			log.Warn("[macl-agent] control signal amIServer failed : %v\n", err)
+			a.sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(controlSignal.FiveTuple.TxId, "acl control signal amIServer 실패", err))
 			continue
 		}
 
-		if isClient, err := amIClient(controlSignal.FiveTuple); err == nil && isClient {
-			log.Info("acl control signal amIClient 성공 : %s\n", controlSignal)
-			if controlSignal.FiveTuple.Protocol == "tcp" {
-				err := NewTestSender(log).sendPacketToDestination(&controlSignal)
-				if err != nil {
-					sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(controlSignal.FiveTuple.TxId, "[macl-agent-sender] test failed", err))
-					continue
-				} else {
-					sendResponse(connection, raddr, controlsignal.NewSuccessResponseSignal(controlSignal.FiveTuple.TxId, &controlSignal.FiveTuple))
-				}
-
+		if isSource, err := controlSignal.FiveTuple.AmISource(); err == nil && isSource {
+			log.Info("[macl-agent] control signal AmISource success", "signal", controlSignal)
+			err := NewTestSender(log).sendPacketToDestination(&controlSignal)
+			if err != nil {
+				a.sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(controlSignal.FiveTuple.TxId, "[macl-agent-sender] test failed", err))
+				continue
+			} else {
+				a.sendResponse(connection, raddr, controlsignal.NewSuccessResponseSignal(controlSignal.FiveTuple.TxId, &controlSignal.FiveTuple))
 			}
 		}
 		if err != nil {
-			log.Warn("acl control signal amIClient 실패 : %v\n", err)
-			sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(controlSignal.FiveTuple.TxId, "acl control signal amIClient 실패", err))
+			log.Warn("[macl-agent] control signal AmISource failed", "error", err)
+			a.sendResponse(connection, raddr, controlsignal.NewFailResponseSignal(controlSignal.FiveTuple.TxId, "acl control signal amIClient 실패", err))
 			continue
 		}
 
 	}
-
 }
 
 func parseControlSignal(signalBytes []byte) (controlsignal.ControlSignal, error) {
@@ -111,31 +113,16 @@ func parseControlSignal(signalBytes []byte) (controlsignal.ControlSignal, error)
 	return controlSignal, nil
 }
 
-func amIClient(tuple controlsignal.FiveTuple) (bool, error) {
-	myHostIp, err := netutil.IsMyActiveHostIp(tuple.SrcAddress)
-	if err != nil {
-		fmt.Println(err)
-		return false, err
-	}
-	return myHostIp, nil
-}
+func (a *Agent) sendResponse(connection *net.UDPConn, addr *net.UDPAddr, responseSignal *controlsignal.ResponseSignal) {
+	log := a.logger
 
-func amIServer(tuple controlsignal.FiveTuple) (bool, error) {
-	myHostIp, err := netutil.IsMyActiveHostIp(tuple.DestAddress)
-	if err != nil {
-		return false, err
-	}
-	return myHostIp, nil
-}
-
-func sendResponse(connection *net.UDPConn, addr *net.UDPAddr, responseSignal *controlsignal.ResponseSignal) {
 	response, err := json.Marshal(responseSignal)
 	if err != nil {
-		fmt.Printf("응답 송신 실패 : %v\n", err)
+		log.Warn("[macl-agent] failed to send response", "error", err)
 	}
 
 	_, err = connection.WriteToUDP(response, addr)
 	if err != nil {
-		fmt.Printf("응답 송신 실패 : %v\n", err)
+		log.Warn("[macl-agent] failed to send response", "error", err)
 	}
 }
