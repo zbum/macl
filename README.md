@@ -2,7 +2,7 @@
 ## 개요
 * 네트워크 ACL 점검을 위한 간단한 애플리케이션입니다.
 * controller와 agent로 구성되어 있습니다.
-* controller는 ACL을 점검할 수 있는 명령어를 agent에 전달하고, agent는 해당 명령어를 수행하여 결과를 controller에 전달합니다.
+* controller는 ACL을 점검할 수 있는 요청(5-tuple)을 agent에 전달하고, agent는 패킷 송수신을 수행하여 결과를 controller에 전달합니다.
 * agent는 source 와 destination 호스트에 설치, 실행되어 있어야 합니다. 
 * agent는 controller 의 요청에 따라 패킷을 리스닝하거나 전송합니다. 
   * source agent 는 destination 에 패킷을 전송합니다. 3번 재시도하도록 되어 있으며, 3초 동안 요청에 응답이 없으면 실패로 처리합니다.
@@ -51,3 +51,4 @@ $ ./macl -type controller -profile k8s
 ## 할일
 * http, https, jdbc 등 응용레벨의 protocol을 식별하여 확인하도록 수정
 * 이미 Listening 하는 포트에 대한 회피 및 확인 방법 고민
+* 예쁜 리포팅과 문제 발생시 알림
